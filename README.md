@@ -1,7 +1,5 @@
 # abkit
 
-![tests](https://github.com/MatinNikoo/abkit/actions/workflows/tests.yml/badge.svg)
-
 A small Python library for analyzing online A/B tests the way big product teams do it, plus the simulations that prove each method works and an analysis of a real experiment.
 
 **Try it in your browser:** the [Experiment Lab](https://matinnikoo.github.io/lab.html) runs the same math on a real 90,000 player test or on your own CSV, step by step. Its numbers match this library's.
