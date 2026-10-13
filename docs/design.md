@@ -16,7 +16,7 @@ Give an analyst one place to go from "here's the experiment data" to a decision 
 2. Health checks run before results. A broken split should be loud, not a footnote.
 3. Plain inputs. Arrays in, small result objects out, and a thin `Experiment` wrapper on top for DataFrames. No framework to learn.
 4. Few dependencies: numpy, scipy and pandas only.
-5. Tested on every push.
+5. Every method has tests, including the command line tool.
 
 ## Key decisions
 
@@ -49,5 +49,5 @@ Give an analyst one place to go from "here's the experiment data" to a decision 
 ## How I'd know it's working
 
 * The simulation suite reproduces the published properties of each method (false positive rate, coverage, variance reduction).
-* The tests pass in CI on two Python versions, including the command line tool.
+* All 23 tests pass, including the command line tool.
 * A real public experiment runs end to end and the result lines up with other analyses of that data, and the sample ratio check flags the uneven split.
