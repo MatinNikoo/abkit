@@ -1,123 +1,114 @@
-# What does it cost to turn off the internet?
+# abkit
 
-When a government shuts off a country's internet, nobody can run the same country with the internet left on. So there's no A/B test. I built each country a **synthetic twin** out of countries that stayed online, and measured the gap. The data is GitHub's public [Innovation Graph](https://github.com/github/innovationgraph), which counts how much code every country pushes each quarter.
+A small Python library for analyzing online A/B tests the way big product teams do it, plus the simulations that prove each method works and an analysis of a real experiment.
 
-**Interactive version:** [matinnikoo.github.io/shutdowns.html](https://matinnikoo.github.io/shutdowns.html) · **One page memo:** [memo/memo.pdf](memo/memo.pdf)
+**Try it in your browser:** the [Experiment Lab](https://matinnikoo.github.io/lab.html) runs the same math on a real 90,000 player test or on your own CSV, step by step. Its numbers match this library's.
 
-![Iran vs its twin](figures/iran.png)
+Most A/B test tutorials stop at a t test. Real experiments run into a few problems that a t test doesn't handle:
 
-## What I found
+* **People check results every day.** If you peek at a normal p value and stop the first time it dips under 0.05, your false positive rate isn't 5%. In my simulations it was 21% after 10 looks and 39% after 100.
+* **Experiments are noisy and users are expensive.** You can cut the noise a lot by using what you already knew about each user before the test started (CUPED).
+* **Some metrics are ratios**, like clicks per session. Treating every session as independent makes the intervals too narrow.
+* **Assignment breaks.** If you meant to split users 50/50 and got 49.6/50.4 on 90,000 players, something is wrong and nothing downstream can be trusted.
+* **People want "what's the chance B is better?"**, not a p value. That's a fair question, but the usual flat prior answer is overconfident when real effects are small, which they usually are.
+* **Teams track lots of metrics and slice by segment.** Test 20 metrics, or split results by 10 countries, and you'll usually find a fake win somewhere.
 
-Long shutdowns are huge. Iran's two blackouts in early 2026 cut its coding activity by **69%** compared with its twin (95% interval 61% to 76%). Myanmar after the 2021 coup fell 56%, and Sudan after its 2021 coup fell 32%.
+abkit handles all of these.
 
-People don't catch up afterward. Across the six full shutdowns, each day offline cost about **1.3 days** of work (95% interval 1.06 to 1.56). If people made up the lost time, that number would be under 1, and it never was.
+```python
+import abkit as ab
 
-Some of the drop is people still coding, just from somewhere else on the map. GitHub places accounts by where their connections come from. The number of developers placed in a country basically never goes down, but it fell 6% in Iran in early 2026 and 12% in Myanmar in 2021. That's what VPN use or people leaving would look like.
+exp = ab.Experiment(df, variant="group", control="A", treatment="B")
+exp.check(pre_period=["visits_last_month"])        # sample ratio and balance checks
+print(exp.analyze("revenue", covariate="revenue_last_month"))   # CUPED
+print(exp.analyze_ratio("clicks", "sessions"))     # delta method
+exp.analyze_many(["clicks", "orders", "revenue"])  # with false discovery rate control
+print(exp.sequential("orders", mde=0.01))          # safe to check every day
+table, p_differ = exp.segments("orders", by="country")   # per segment, plus "do they really differ?"
+print(exp.bayes("orders", prior_sd=0.004))         # chance B is better, with a prior from past tests
+```
 
-Short shutdowns don't show up at all. In simulations a shutdown has to last about a month before it gets caught 80% of the time. So the five to eleven day ones in Kazakhstan, Tanzania and Bangladesh are invisible here. That's a limit of quarterly data, it doesn't mean they did no harm.
+Or from the command line, with a CSV that has one row per user:
 
-Simple comparisons can point the wrong way. Next to the same quarter a year earlier, Iran's June 2025 blackout quarter looks like **+24%** growth. Next to its twin it's **18% lower**, because everyone else grew even faster.
+```bash
+abkit report results.csv --variant group --control A --treatment B --metrics orders revenue --covariate revenue_last_month --segment country
+abkit size --baseline 0.19 --mde 0.01      # how many users do I need?
+```
 
-| Shutdown | What happened | vs twin | 95% interval | If a day cost a day |
-|---|---|---|---|---|
-| Iran, 2026 Q1 | Blackout from 8 Jan, then a near total cut from 28 Feb | **−69%** | −76% to −61% | −59% |
-| Myanmar, 2021 Q1 and Q2 | Coup, nightly cuts, all mobile data off from 15 Mar | **−56%** | −69% to −39% | partial |
-| Sudan, 2021 Q4 | Fixed and mobile cut for 24 days after the coup | **−32%** | −47% to −13% | −26% |
-| Iran, 2022 Q4 | Mobile curfews and app blocks during protests | −22% | −43% to +7% | partial |
-| Iran, 2025 Q2 | Near total blackout for about a week in June | −18% | −35% to +5% | −9% |
-| Kazakhstan, 2022 Q1 | Nationwide for about 5 days | −9% | −39% to +34% | −6% |
-| Tanzania, 2025 Q4 | Nationwide for 5 days around the election | −5% | −22% to +16% | −5% |
-| Pakistan, 2023 Q2 | Mobile only, 4 days | +3% | −17% to +29% | partial |
-| Bangladesh, 2024 Q3 | Nationwide for about 7 to 11 days in July and August | +11% | −24% to +61% | −10% |
+## Does it actually work?
 
-Dates, scope and sources for every event are in [data/events.csv](data/events.csv).
+I can't prove a method works on real data, because I never know the true answer there. So every method gets tested on thousands of made up experiments where I do know it. Everything below comes from `simulations/run_simulations.py`.
 
-![Every shutdown](figures/events.png)
+![Peeking](figures/peeking.png)
 
-## How it works
+| Claim | What I measured |
+|---|---|
+| Peeking at a normal p value breaks it | 2,000 A/A tests (no real difference), checked 100 times each: 39% falsely "won". The always valid test: 2.2%. |
+| Always valid testing costs a little power but often stops early | For an effect of 0.06 sd: 92% power vs 99% for a single look at the end, but it stopped after 45% of the users on average. |
+| CUPED removes about rho squared of the variance | Measured 9%, 25%, 49%, 81% at correlations 0.3, 0.5, 0.7, 0.9. Theory says 9%, 25%, 49%, 81%. |
+| CUPED doesn't break the confidence intervals | 95% intervals covered the true effect 94% to 96% of the time at every correlation. |
+| More pre period metrics remove more noise | One covariate removed 25% of the variance, two removed 50%, matching theory exactly. |
+| Ratio metrics need the delta method | 95% intervals covered 96% of the time with the delta method, only 88% treating sessions as independent. |
+| The sample size formula gives the power it promises | Promised 80%, got 82%, 80% and 79%. |
+| Multiple testing corrections work | 20 metrics, 15 with no effect: some false win 53% of the time uncorrected, 4.4% with Holm. Benjamini Hochberg kept false discoveries at 3.8%. |
+| A flat prior's "chance to win" is overconfident on small effects | When it said 85%, the better version won only 73% of the time. With a prior matching past tests, 86%. |
+| Slicing by segment finds fake wins | A treatment that did nothing in any of 10 segments still looked significant in at least one segment 41% of the time. With the correction, 5.8%. The test for "do segments really differ" fired 6.1% of the time. |
 
-**The data.** Quarterly git pushes for every economy from 2020 Q1 to 2026 Q1, built into a panel with SQL ([sql/panel.sql](sql/panel.sql), run in DuckDB). The donor pool is 106 countries with no listed shutdown and at least 10,000 pushes in every quarter. Everything is on the log scale, so effects come out as percentages.
+![CUPED](figures/cuped.png)
 
-**Two methods.** Both pick weights for the donor countries so the weighted mix moves like the treated country before the event.
+![Is chance to win honest?](figures/bayes_calibration.png)
 
-* *Synthetic control* (Abadie, Diamond and Hainmueller 2010), in the demeaned form so the twin can sit at a different level and only has to match the shape (Ferman and Pinto 2021).
-* *Synthetic difference in differences* (Arkhangelsky et al. 2021). It adds a penalty that spreads the weight over more countries and also weights the pre period quarters, which made it more precise here. It's the headline method.
+## A real experiment: Cookie Cats
 
-The weights are solved exactly as a nonnegative least squares problem. A test checks the solver against the Frank Wolfe method from the paper.
+[Cookie Cats](analysis/cookie_cats.py) is a mobile puzzle game. 90,189 new players were randomly split between two versions. One put the first gate (where you wait or pay to keep playing) at level 30, the other at level 40.
 
-**How sure.** Two kinds of placebo. In space, every donor country gets the fake shutdown and goes through the same method, which shows how big an "effect" appears by chance. In time, the treated country gets fake shutdowns in earlier quarters, which measures how noisy that particular country is. Small countries like Sudan are much noisier than the big donors, so the standard error is the larger of the two.
+* **The split check failed.** 44,700 vs 45,489 players, a sample ratio mismatch with p = 0.009. In a real company this would mean stopping to find out why before trusting anything. It's an easy check to skip.
+* **Moving the gate later hurt 7 day retention.** 19.0% vs 18.2%, a 4.3% relative drop (95% CI 1.7% to 6.9%), and it holds after correcting for testing three metrics (adjusted p = 0.005).
+* **1 day retention and rounds played didn't clearly change.**
+* **Replayed as if someone checked it 50 times**, the always valid test still reaches the same call, on average after about 74% of the players.
 
-**Did a day cost a day?** If coding just pauses while the internet is off, a quarter with share s offline should land at (1 − s) of its twin. I fit measured = β × predicted on the log scale across the six full shutdowns, weighted by precision. β = 1 means a day costs a day, β < 1 means people made it up, β > 1 means the damage outlasted the outage.
+![Cookie Cats](figures/cookie_cats_sequential.png)
 
-![Dose response](figures/dose.png)
+The data has no timestamps, so the replay uses random arrival orders, and the mismatch means the retention result should be taken with some caution.
 
-## Checking the methods on fake shutdowns
-
-I can't check the real answer, so `analysis/simulations.py` plants shutdowns of known size into countries that never had one, at random quarters, 250 times for each size.
-
-| Planted drop | About this many days | Synthetic DiD flags it | Synthetic control flags it | Interval covers the truth |
-|---|---|---|---|---|
-| 0% | none | 1.6% (false alarms) | 2.8% | 98% |
-| 10% | 9 | 6% | 3% | 99% |
-| 20% | 18 | 41% | 26% | 97% |
-| 35% | 32 | 88% | 81% | 99% |
-| 50% | 46 | 95% | 93% | 98% |
-
-Bias stays within about 1.5 percentage points at every size. False alarms stay under 5%, and the intervals cover the truth a bit more often than 95%, so they're on the cautious side. Synthetic DiD catches more real drops than synthetic control at every size, which is why it's the headline method.
-
-![Power](figures/power.png)
-
-## Robustness
-
-The clear results barely move under different choices (synthetic DiD, change vs twin).
-
-| | Iran 2026 | Myanmar 2021 | Sudan 2021 | Iran 2022 |
-|---|---|---|---|---|
-| Main estimate | −69.0% | −56.4% | −32.5% | −22.0% |
-| Only donors with 50k+ pushes a quarter | −68.4% | −55.7% | −32.8% | −20.7% |
-| Only donors with 200k+ | −68.0% | −56.3% | −27.3% | −21.1% |
-| Drop the biggest donor | −68.7% | −56.7% | −31.5% | −22.4% |
-| Only the last 8 pre quarters | −68.9% | n/a | n/a | −23.0% |
-| Plain synthetic control | −70.4% | −56.8% | −38.4% | −23.8% |
-
-## What this can't tell you
-
-* Shutdowns come with coups, protests and war, so each estimate is the cost of everything that happened that quarter. The dose response is how I get at the internet part, since it asks whether the days offline explain the drop on their own.
-* The twin assumes the country would have kept up with its donors. In early 2026 most countries jumped about 30% and Iran's twin jumps with them. If Iran would have stayed flat instead, the drop is 59%, which is exactly what its days offline predict. So the conclusion holds either way.
-* Myanmar only has four quarters before the coup, so its twin is built on very little history.
-* GitHub locates activity by IP address, so VPNs move it to other countries. That hurts the main numbers a bit, and it's also what the location finding is built on.
-* The day counts are rough. Iran's January 2026 restoration was partial and uneven, so I use a range of 48 to 58 days. With the low count β is 1.51, with the high count 1.14.
-
-## Repo
+## What's in here
 
 | Path | What it is |
 |---|---|
-| `sql/panel.sql` | Builds the country by quarter panel in DuckDB |
-| `data/events.csv` | Every shutdown, with dates, days offline and a source |
-| `shutdowns/synth.py` | Synthetic control and synthetic DiD |
-| `shutdowns/inference.py` | Placebo tests in space and time |
-| `analysis/run_events.py` | All estimates, the dose response, location drift and robustness |
-| `analysis/simulations.py` | Planted shutdowns |
-| `analysis/figures.py` | Charts |
-| `tests/` | 16 tests |
-| `memo/memo.pdf` | The one page version for someone who has two minutes |
+| `abkit/core.py` | Welch t test, delta method for ratio metrics and relative lift, CUPED with one or more covariates, sample ratio check, segment heterogeneity test, sample size |
+| `abkit/sequential.py` | mSPRT always valid p values and confidence sequences |
+| `abkit/multiple.py` | Holm and Benjamini Hochberg |
+| `abkit/bayes.py` | Chance to win, expected loss, and an optional prior from past experiments |
+| `abkit/experiment.py` | The `Experiment` class that ties it together |
+| `abkit/cli.py` | The `abkit` command |
+| `tests/` | 23 tests, run with `pytest -q` |
+| `simulations/` | The simulations behind every claim above |
+| `analysis/` | The Cookie Cats analysis |
+| `docs/design.md` | Why the library is built the way it is |
+| `paper/abkit.pdf` | A short write up of the methods and results |
+
+## Run it
 
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 pytest -q
-python analysis/run_events.py
-python analysis/simulations.py      # about 25 minutes
-python analysis/figures.py
+python simulations/run_simulations.py
+python analysis/get_data.py && python analysis/cookie_cats.py
 ```
 
 ## References
 
-* Abadie, Diamond and Hainmueller (2010). Synthetic control methods for comparative case studies.
-* Arkhangelsky, Athey, Hirshberg, Imbens and Wager (2021). Synthetic difference in differences.
-* Ferman and Pinto (2021). Synthetic controls with imperfect pretreatment fit.
-* Abadie (2021). Using synthetic controls, feasibility, data requirements, and methodological aspects.
-* GitHub Innovation Graph, released under CC0.
+* Deng, Xu, Kohavi and Walker (2013). Improving the sensitivity of online controlled experiments by utilizing pre experiment data.
+* Deng, Knoblich and Lu (2018). Applying the delta method in metric analytics.
+* Johari, Koomen, Pekelis and Walsh (2017). Peeking at A/B tests.
+* Howard, Ramdas, McAuliffe and Sekhon (2021). Time uniform, nonparametric, nonasymptotic confidence sequences.
+* Fabijan et al. (2019). Diagnosing sample ratio mismatch in online controlled experiments.
+* Cochran (1954). The combination of estimates from different experiments.
+* Deng (2015). Objective Bayesian two sample hypothesis testing for online controlled experiments.
+* Benjamini and Hochberg (1995). Controlling the false discovery rate.
+
+The Cookie Cats data was released by Tactile Entertainment for a DataCamp project. The download script pulls a public copy from GitHub.
 
 ## License
 
-MIT for the code. The GitHub data is CC0.
+MIT
