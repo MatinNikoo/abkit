@@ -1,0 +1,194 @@
+{
+  "peeking": {
+    "sims": 2000,
+    "looks": 100,
+    "naive_false_positive_after_all_looks": 0.394,
+    "naive_false_positive_after_10_looks": 0.206,
+    "msprt_false_positive_after_all_looks": 0.022
+  },
+  "sequential_vs_fixed": {
+    "effects_sd": [
+      0.0,
+      0.02,
+      0.04,
+      0.06,
+      0.08
+    ],
+    "msprt_power": [
+      0.018,
+      0.102,
+      0.522,
+      0.918,
+      0.998
+    ],
+    "fixed_power": [
+      0.046,
+      0.282,
+      0.808,
+      0.994,
+      1.0
+    ],
+    "msprt_avg_share_of_sample_when_stopped": [
+      0.4466666666666666,
+      0.5098039215686274,
+      0.5668965517241379,
+      0.45080610021786494,
+      0.3055310621242485
+    ]
+  },
+  "cuped": {
+    "rho": [
+      0.0,
+      0.3,
+      0.5,
+      0.7,
+      0.9
+    ],
+    "variance_cut_measured": [
+      0.00012450984872436344,
+      0.09025785627434257,
+      0.25011525260507406,
+      0.4905379569310677,
+      0.8099840753361849
+    ],
+    "variance_cut_theory": [
+      0.0,
+      0.09,
+      0.25,
+      0.48999999999999994,
+      0.81
+    ],
+    "ci_coverage_plain": [
+      0.9425,
+      0.96125,
+      0.94625,
+      0.9475,
+      0.9575
+    ],
+    "ci_coverage_cuped": [
+      0.94125,
+      0.9575,
+      0.94625,
+      0.9475,
+      0.94875
+    ],
+    "power_plain": [
+      0.6075,
+      0.61625,
+      0.605,
+      0.61625,
+      0.61375
+    ],
+    "power_cuped": [
+      0.6075,
+      0.635,
+      0.73875,
+      0.885,
+      0.99875
+    ]
+  },
+  "ratio_metric": {
+    "coverage_delta_method": 0.962,
+    "coverage_naive_sessions": 0.88
+  },
+  "sample_size": {
+    "mde_sd": [
+      0.02,
+      0.05,
+      0.1
+    ],
+    "promised_power": 0.8,
+    "achieved_power": [
+      0.8175,
+      0.8025,
+      0.785
+    ]
+  },
+  "multiple_testing": {
+    "metrics": 20,
+    "null_metrics": 15,
+    "chance_any_false_win_raw": 0.531,
+    "chance_any_false_win_holm": 0.044,
+    "false_discovery_rate_bh": 0.03809345238095239
+  },
+  "cuped_multi": {
+    "variance_cut_one_covariate": 0.2502153089346272,
+    "variance_cut_two_covariates": 0.5001548844457155,
+    "theory_one": 0.25,
+    "theory_two": 0.5,
+    "ci_coverage_two": 0.9366666666666666
+  },
+  "segments": {
+    "segments": 10,
+    "chance_some_segment_significant_raw": 0.414,
+    "chance_some_segment_significant_bh": 0.058,
+    "heterogeneity_test_false_alarm_rate": 0.061
+  },
+  "bayes_calibration": {
+    "flat_prior": [
+      [
+        0.5511638824884793,
+        0.5069124423963134,
+        434
+      ],
+      [
+        0.6498741721854304,
+        0.609271523178808,
+        453
+      ],
+      [
+        0.7505802238805971,
+        0.67590618336887,
+        469
+      ],
+      [
+        0.8517814136125654,
+        0.7347294938917975,
+        573
+      ],
+      [
+        0.9379510767790261,
+        0.8539325842696629,
+        534
+      ],
+      [
+        0.987848929236499,
+        0.9441340782122905,
+        537
+      ]
+    ],
+    "prior_from_past_tests": [
+      [
+        0.54904492481203,
+        0.5473684210526316,
+        665
+      ],
+      [
+        0.6495172916666667,
+        0.65,
+        600
+      ],
+      [
+        0.7504879227053141,
+        0.7230273752012882,
+        621
+      ],
+      [
+        0.851498726655348,
+        0.8590831918505942,
+        589
+      ],
+      [
+        0.9359149002493765,
+        0.9376558603491272,
+        401
+      ],
+      [
+        0.9847852822580646,
+        0.9596774193548387,
+        124
+      ]
+    ],
+    "note": "each row is (stated chance, how often it was right, count)"
+  }
+}

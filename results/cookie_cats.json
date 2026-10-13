@@ -1,0 +1,47 @@
+{
+  "health": {
+    "n_control": 44700,
+    "n_treatment": 45489,
+    "srm_p": 0.008607987810836262,
+    "srm_warning": true
+  },
+  "metrics": [
+    {
+      "metric": "retention_1",
+      "control": 0.4481879194630872,
+      "treatment": 0.44228274967574577,
+      "rel_lift": -0.01317565585974656,
+      "ci_low": -0.027554258437813273,
+      "ci_high": 0.0012029467183201532,
+      "p": 0.07441443713953831,
+      "p_bh": 0.11162165570930746
+    },
+    {
+      "metric": "retention_7",
+      "control": 0.19020134228187918,
+      "treatment": 0.18200004396667327,
+      "rel_lift": -0.043119034896460184,
+      "ci_low": -0.069244866665645,
+      "ci_high": -0.016993203127275373,
+      "p": 0.001556530181006654,
+      "p_bh": 0.004669590543019962
+    },
+    {
+      "metric": "rounds_capped",
+      "control": 49.13583892617449,
+      "treatment": 48.853920728088106,
+      "rel_lift": -0.005737526910041479,
+      "ci_low": -0.0280434635122107,
+      "ci_high": 0.01656840969212774,
+      "p": 0.615193613123773,
+      "p_bh": 0.615193613123773
+    }
+  ],
+  "retention_7_players_needed_per_group_for_80pct_power": 35948,
+  "sequential_replay": {
+    "orders": 200,
+    "msprt_called_it": 1.0,
+    "naive_peeking_called_it": 1.0,
+    "msprt_avg_share_when_called": 0.7360947565667654
+  }
+}

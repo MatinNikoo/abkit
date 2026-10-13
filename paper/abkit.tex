@@ -1,0 +1,130 @@
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{caption}
+\captionsetup{font=small}
+\setlength{\parskip}{4pt}
+
+\title{\textbf{abkit: Trustworthy A/B Test Analysis,\\Checked by Simulation and Applied to a Real Experiment}}
+\author{Matin Nikoomanzar\\University of California, Los Angeles\\\small\url{https://github.com/MatinNikoo/abkit}}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Online experiments are simple in principle, but a few common problems quietly make their results wrong: checking results repeatedly, noisy metrics, ratio metrics whose unit differs from the randomized unit, broken assignment, and testing many metrics at once. I built an open source Python library and command line tool, abkit, that handles each one using established methods (Welch's test, CUPED, the delta method, sample ratio checks, the mixture sequential probability ratio test, false discovery rate control, and a Bayesian chance to win). Every method is checked on simulated experiments where the truth is known. Peeking at an ordinary p value 100 times produced false positives in 39.4\% of 2{,}000 experiments with no real effect, while the always valid test held this to 2.2\%. CUPED removed variance in line with the theoretical $\rho^2$ at every correlation tested while keeping 95\% intervals near their nominal coverage, and the delta method restored coverage for ratio metrics from 88\% to 96\%. Applied to a public mobile game experiment with 90{,}189 players, the library finds that moving the first gate from level 30 to 40 lowered 7 day retention by 4.3\% (95\% CI 1.7\% to 6.9\%), but also flags a sample ratio mismatch ($p = 0.009$) that should be investigated before acting on the result.
+\end{abstract}
+
+\section{Introduction}
+Product teams decide what to ship by running randomized experiments. The textbook analysis is a two sample test at a sample size chosen in advance. In practice that analysis is often wrong for reasons that have nothing to do with the math of the t test. People check dashboards daily and stop when the result looks good. Metrics are noisy, so experiments need more users than they could. Metrics like clicks per session are ratios whose denominator is not the unit that was randomized. Assignment and logging bugs produce uneven splits. And a dashboard of twenty metrics will usually show at least one false win.
+
+None of these problems are new, and each has a known fix in the literature. The goal of this project was to put those fixes in one small, tested library, and, more importantly, to verify each one rather than trust it: every method is checked on simulated experiments with a known answer before being used on real data.
+
+\section{Methods}
+Throughout, $Y$ is a user level outcome, $C$ and $T$ index control and treatment, and $\Delta = \mu_T - \mu_C$.
+
+\paragraph{Difference in means.} The default test is Welch's $t$ test with the Welch Satterthwaite degrees of freedom, which allows the treatment to change the variance. Binary outcomes are handled as means of 0/1 values. The relative lift $\bar Y_T/\bar Y_C - 1$ gets its interval from the delta method,
+\[ \operatorname{Var}\!\left(\frac{\bar Y_T}{\bar Y_C}\right) \approx \frac{\operatorname{Var}(\bar Y_T)}{\bar Y_C^2} + \frac{\bar Y_T^2 \operatorname{Var}(\bar Y_C)}{\bar Y_C^4}. \]
+
+\paragraph{Ratio metrics.} For a metric $\sum_i X_i / \sum_i N_i$ such as clicks per session, sessions from the same user are correlated, so treating sessions as independent understates the variance. Following Deng, Knoblich and Lu (2018), the variance is computed at the user level,
+\[ \operatorname{Var}\!\left(\frac{\bar X}{\bar N}\right) \approx \frac{1}{n}\left(\frac{\sigma_X^2}{\mu_N^2} - \frac{2\mu_X \sigma_{XN}}{\mu_N^3} + \frac{\mu_X^2 \sigma_N^2}{\mu_N^4}\right). \]
+
+\paragraph{CUPED.} Given a covariate $X$ measured before the experiment, CUPED (Deng, Xu, Kohavi and Walker, 2013) analyzes $Y - \theta(X - \bar X)$ with $\theta = \operatorname{Cov}(Y,X)/\operatorname{Var}(X)$. The expected difference is unchanged because $X$ is independent of assignment, and the variance falls by a factor of $1-\rho^2$, where $\rho = \operatorname{corr}(X, Y)$. With several covariates, $\theta$ becomes the least squares fit of $Y$ on all of them and the variance falls by $1-R^2$. In abkit, $\theta$ is estimated on both groups pooled, and the library warns when the covariate is unbalanced between groups, since a covariate affected by the treatment biases the estimate.
+
+\paragraph{Sample ratio mismatch.} A chi square goodness of fit test compares the observed group sizes to the intended split (Fabijan et al., 2019). A mismatch indicates a bug in assignment or logging that can bias every metric.
+
+\paragraph{Sequential testing.} For continuous monitoring, abkit implements the mixture sequential probability ratio test of Johari, Koomen, Pekelis and Walsh (2017). With a normal mixture $\Delta \sim N(0, \tau^2)$ over alternatives, an estimate $\hat\Delta_n$ with variance $V_n$ gives the likelihood ratio
+\[ \Lambda_n = \sqrt{\frac{V_n}{V_n + \tau^2}}\,\exp\!\left(\frac{\tau^2 \hat\Delta_n^2}{2 V_n (V_n + \tau^2)}\right). \]
+Under the null, $\Lambda_n$ is a nonnegative martingale, so by Ville's inequality $P(\exists n: \Lambda_n \ge 1/\alpha) \le \alpha$. The always valid p value is $p_n = \min_{k \le n} \min(1, 1/\Lambda_k)$, and the matching confidence sequence is
+\[ \hat\Delta_n \pm \sqrt{\frac{V_n (V_n + \tau^2)}{\tau^2}\left(2\log\frac{1}{\alpha} + \log\frac{V_n + \tau^2}{V_n}\right)}, \]
+which can be intersected over time (Howard et al., 2021). The variance is estimated from the data, so the guarantee is asymptotic, which suits the large samples of online experiments. I set $\tau$ to the smallest effect of interest.
+
+\paragraph{Segments.} Per segment effects are reported with adjusted p values, together with Cochran's Q test of whether they differ by more than noise, $Q = \sum_k w_k(\hat\Delta_k - \bar\Delta_w)^2$ with $w_k = 1/\mathrm{SE}_k^2$, compared to $\chi^2_{K-1}$.
+
+\paragraph{Chance to win.} For a Bayesian readout, binary metrics get Beta(1, 1) priors and averages get normal approximate posteriors, and the probability that the treatment is better and the expected loss of shipping it are estimated by sampling. Because flat priors overstate certainty when true effects are small relative to the noise, abkit also accepts a normal prior on the lift, $\Delta \sim N(0, s^2)$, with $s$ taken from the spread of past experiments. The posterior is then normal with mean $\hat\Delta s^2/(s^2 + \mathrm{SE}^2)$ and variance $s^2\mathrm{SE}^2/(s^2+\mathrm{SE}^2)$.
+
+\paragraph{Multiple metrics.} Holm's procedure controls the family wise error rate, and Benjamini Hochberg controls the false discovery rate. The latter is the default for metric dashboards.
+
+\section{Simulation study}
+Each claim is checked with experiments simulated from known distributions. Table~\ref{tab:sim} summarizes the results, and the code is in \texttt{simulations/run\_simulations.py}.
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{p{4.6cm}p{9.6cm}}
+\toprule
+Check & Result \\
+\midrule
+Peeking, 2{,}000 A/A tests, 100 looks & Ordinary p value: 20.6\% false positives by look 10, 39.4\% by look 100. mSPRT: 2.2\%. \\
+Power, 500 tests per effect size & Effect 0.04 sd: 52\% (mSPRT) vs 81\% (single look). Effect 0.06 sd: 92\% vs 99\%, with mSPRT stopping after 45\% of the sample on average. \\
+CUPED variance reduction & Measured 9\%, 25\%, 49\%, 81\% at $\rho = 0.3, 0.5, 0.7, 0.9$, matching $\rho^2$. \\
+CUPED interval coverage & 94\% to 96\% at every $\rho$ (nominal 95\%). Power at $\rho = 0.7$ rose from 62\% to 89\%. \\
+Two covariates vs one & 50\% vs 25\% of the variance removed, matching $R^2$. \\
+Ratio metric coverage & Delta method 96.2\%, sessions treated as independent 88.0\%. \\
+Sample size formula & Promised 80\% power, achieved 82\%, 80\%, 79\%. \\
+20 metrics, 15 null & Any false win: 53\% uncorrected, 4.4\% Holm. Benjamini Hochberg false discovery rate 3.8\%. \\
+Chance to win, tiny true effects & Flat prior: stated 85\%, right 73\% of the time. Prior matched to past effects: stated 85\%, right 86\%. \\
+10 segments, no effect anywhere & Some segment significant: 41\% uncorrected, 5.8\% with Benjamini Hochberg. Cochran's Q false alarm rate 6.1\%. \\
+\bottomrule
+\end{tabular}
+\caption{Simulation results. All rates are empirical frequencies over the stated number of simulated experiments.}
+\label{tab:sim}
+\end{table}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.49\linewidth]{../figures/peeking.png}
+\includegraphics[width=0.49\linewidth]{../figures/sequential_power.png}
+\caption{Left: false positive rate under repeated looks in experiments with no effect. Right: the power cost of always valid inference, and how early it stops.}
+\end{figure}
+
+The always valid test is conservative with no effect (2.2\% against a 5\% budget), which is expected, since Ville's inequality is a bound rather than an equality. That conservatism is the price paid at the very end of a test. In exchange the test can stop as soon as the evidence is clear, and it stays valid no matter how often anyone looks.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{../figures/cuped.png}
+\caption{CUPED removes $\rho^2$ of the variance, which turns directly into power without more users.}
+\end{figure}
+
+\section{Case study: Cookie Cats}
+Cookie Cats is a mobile puzzle game. In a public experiment, 90{,}189 new players were randomized to have the first progress gate at level 30 (control) or level 40. Outcomes are whether the player returned 1 and 7 days after installing, and the number of rounds played in the first two weeks (capped at the 99th percentile, 493 rounds, because one player logged almost 50{,}000).
+
+\begin{table}[h]
+\centering\small
+\begin{tabular}{lrrrrr}
+\toprule
+Metric & Gate 30 & Gate 40 & Relative lift & 95\% CI & BH adjusted $p$ \\
+\midrule
+1 day retention & 44.8\% & 44.2\% & $-1.3\%$ & $-2.8\%$ to $+0.1\%$ & 0.112 \\
+7 day retention & 19.0\% & 18.2\% & $-4.3\%$ & $-6.9\%$ to $-1.7\%$ & 0.005 \\
+Rounds played (capped) & 49.1 & 48.9 & $-0.6\%$ & $-2.8\%$ to $+1.7\%$ & 0.615 \\
+\bottomrule
+\end{tabular}
+\caption{Cookie Cats results.}
+\end{table}
+
+Before reading any result, the health check fails: the groups have 44{,}700 and 45{,}489 players, a sample ratio mismatch with $p = 0.009$ under the intended 50/50 split. In a production setting this would mean pausing to find the cause, such as players who were assigned but not logged, before trusting the retention result. With that caveat, moving the gate later lowered 7 day retention, and the result holds after correcting for three metrics. One plausible reading is that hitting the gate earlier gives players a break that brings them back.
+
+The data has no timestamps, so I replayed the experiment in 200 random arrival orders with 50 looks each. The always valid test reached a decision on 7 day retention in all 200 replays, after 74\% of the players on average.
+
+An interactive browser version (the Experiment Lab, \url{https://matinnikoo.github.io/lab.html}) reimplements these steps in JavaScript, and its results match the Python library on this dataset to the reported precision.
+
+\section{Limitations}
+The sequential guarantee relies on a plug in variance and is asymptotic, so it is not exact for small samples. Using machine learning predictions as the CUPED covariate (CUPAC) would likely remove more variance. Heterogeneity is tested across fixed segments only, and the library does not handle interference between users. In the case study, the random arrival orders stand in for real ones, and the sample ratio mismatch limits how much the result should be trusted.
+
+\section*{References}
+\small
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item Benjamini, Y. and Hochberg, Y. (1995). Controlling the false discovery rate. \textit{JRSS B}.
+\item Deng, A., Xu, Y., Kohavi, R. and Walker, T. (2013). Improving the sensitivity of online controlled experiments by utilizing pre experiment data. \textit{WSDM}.
+\item Deng, A., Knoblich, U. and Lu, J. (2018). Applying the delta method in metric analytics. \textit{KDD}.
+\item Fabijan, A. et al. (2019). Diagnosing sample ratio mismatch in online controlled experiments. \textit{KDD}.
+\item Howard, S., Ramdas, A., McAuliffe, J. and Sekhon, J. (2021). Time uniform, nonparametric, nonasymptotic confidence sequences. \textit{Annals of Statistics}.
+\item Johari, R., Koomen, P., Pekelis, L. and Walsh, D. (2017). Peeking at A/B tests. \textit{KDD}.
+\item Kohavi, R., Tang, D. and Xu, Y. (2020). \textit{Trustworthy Online Controlled Experiments}. Cambridge University Press.
+\end{itemize}
+\end{document}
