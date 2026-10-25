@@ -1,0 +1,27 @@
+{
+  "sims": 600,
+  "users_per_group": 20000,
+  "control_rate": 0.001,
+  "treatment_rate": 0.00189,
+  "looks": 50,
+  "interval_misses_truth_at_some_look": {
+    "before_fix": {
+      "rate": 0.3383333333333333,
+      "mc_se": 0.019315964420175386
+    },
+    "after_fix": {
+      "rate": 0.006666666666666667,
+      "mc_se": 0.003322203641716901
+    }
+  },
+  "interval_empty_at_some_look": {
+    "before_fix": {
+      "rate": 0.115,
+      "mc_se": 0.013024016277631107
+    },
+    "after_fix": {
+      "rate": 0.0,
+      "mc_se": 0.0016666666666666668
+    }
+  }
+}

@@ -96,3 +96,12 @@ def test_experiment_flags_srm():
     df = pd.DataFrame({"v": ["A"] * 6000 + ["B"] * 5000, "y": rng.normal(0, 1, 11000)})
     with pytest.warns(UserWarning, match="sample ratio mismatch"):
         ab.Experiment(df, "v", "A", "B").check()
+
+
+def test_tiny_p_values_print_as_less_than():
+    from abkit.core import fmt_p
+    assert fmt_p(0.01234) == "p = 0.0123"
+    assert fmt_p(3e-9) == "p < 0.0001"
+    assert fmt_p(0.02, "adjusted p") == "adjusted p = 0.0200"
+    big = ab.mean_test(rng.normal(0, 1, 2000), rng.normal(1, 1, 2000))
+    assert "p < 0.0001" in str(big)

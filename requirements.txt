@@ -1,0 +1,10 @@
+# exact versions the results in results/ were produced with, on Python 3.13.
+# These pins need Python 3.13. pyproject.toml allows Python 3.10 and newer with looser version ranges.
+numpy==2.5.3
+scipy==1.18.1
+pandas==3.0.5
+matplotlib==3.11.2
+statsmodels==0.15.0
+scikit-learn==1.9.1
+hypothesis==6.170.5
+pytest==9.1.1

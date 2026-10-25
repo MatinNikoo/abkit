@@ -40,8 +40,22 @@
   "retention_7_players_needed_per_group_for_80pct_power": 35948,
   "sequential_replay": {
     "orders": 200,
+    "order_type": "random shuffles (the data has no timestamps)",
     "msprt_called_it": 1.0,
     "naive_peeking_called_it": 1.0,
     "msprt_avg_share_when_called": 0.7360947565667654
+  },
+  "shuffled_replay_spread": {
+    "orders": 1000,
+    "order_type": "random shuffles (the data has no timestamps)",
+    "msprt_called_it": 1.0,
+    "stop_share_quantiles": {
+      "0.05": 0.21999356906052844,
+      "0.25": 0.5399993347303995,
+      "0.5": 0.7799953431127965,
+      "0.75": 0.9399926820343945,
+      "0.95": 1.0
+    },
+    "stop_share_mean": 0.7142950138043443
   }
 }

@@ -176,7 +176,8 @@ for _ in range(SIMS6):
 out["multiple_testing"] = {"metrics": M, "null_metrics": 15,
                            "chance_any_false_win_raw": any_raw / SIMS6,
                            "chance_any_false_win_holm": any_holm / SIMS6,
-                           "false_discovery_rate_bh": float(np.mean(fdr_bh))}
+                           "false_discovery_rate_bh": float(np.mean(fdr_bh)),
+                           "false_discovery_rate_bh_mc_se": float(np.std(fdr_bh, ddof=1) / np.sqrt(SIMS6))}
 
 
 # ------------------------------------------- 7. CUPED with several covariates

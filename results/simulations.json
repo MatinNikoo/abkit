@@ -109,7 +109,8 @@
     "null_metrics": 15,
     "chance_any_false_win_raw": 0.531,
     "chance_any_false_win_holm": 0.044,
-    "false_discovery_rate_bh": 0.03809345238095239
+    "false_discovery_rate_bh": 0.03809345238095239,
+    "false_discovery_rate_bh_mc_se": 0.0021006828973227053
   },
   "cuped_multi": {
     "variance_cut_one_covariate": 0.2502153089346272,

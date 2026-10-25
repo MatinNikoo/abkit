@@ -1,0 +1,14 @@
+# the Cookie Cats readout from one file. run it from the repo root
+#   abkit report --config examples/cookie_cats.toml --html readout.html
+# The checks, retention rows, guardrail and decision match cookie_cats_readout.md. That file uses
+# rounds capped at the 99th percentile as its third metric, this one uses raw rounds.
+data = "data/cookie_cats.csv"
+variant = "version"
+control = "gate_30"
+treatment = "gate_40"
+metrics = ["retention_7", "retention_1", "sum_gamerounds"]
+primary = "retention_7"
+title = "Cookie Cats: moving the first gate from level 30 to 40"
+
+[guardrail]
+retention_1 = "retention"
