@@ -1,0 +1,37 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  # build the package the way a user gets it, install it in a clean env and test that copy
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build
+      - run: python -m build
+      - run: |
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install dist/*.whl pytest hypothesis statsmodels scikit-learn matplotlib pyarrow openpyxl polars
+          cd /tmp && /tmp/clean/bin/abkit --version
+          cp -r $GITHUB_WORKSPACE/tests $GITHUB_WORKSPACE/results $GITHUB_WORKSPACE/docs $GITHUB_WORKSPACE/README.md /tmp/
+          cd /tmp && /tmp/clean/bin/python -m pytest -q tests
